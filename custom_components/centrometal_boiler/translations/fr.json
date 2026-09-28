@@ -1,0 +1,46 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Ce compte est déjà configuré",
+      "reauth_successful": "La ré-authentification a réussi"
+    },
+    "error": {
+      "cannot_connect": "Connexion impossible, veuillez réessayer.",
+      "invalid_auth": "Identifiants invalides.",
+      "no_devices": "Aucune chaudière n'a été trouvée sur ce compte.",
+      "too_many_requests": "Trop de requêtes, réessayez plus tard.",
+      "unknown": "Erreur inattendue."
+    },
+    "step": {
+      "user": {
+        "description": "Veuillez saisir vos identifiants. Si un préfixe est défini, toutes les entités créées en seront préfixées (utile avec plusieurs chaudières).",
+        "data": {
+          "email": "Adresse e-mail",
+          "password": "Mot de passe",
+          "prefix": "Préfixe (laisser vide si inutile)",
+          "product_prefix": "Préfixer tous les capteurs avec le nom de la chaudière"
+        }
+      },
+      "reauth_confirm": {
+        "description": "Vos identifiants ne sont plus valides. Veuillez les saisir à nouveau.",
+        "data": {
+          "email": "Adresse e-mail",
+          "password": "Mot de passe",
+          "prefix": "Préfixe (laisser vide si inutile)",
+          "product_prefix": "Préfixer tous les capteurs avec le nom de la chaudière"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Modifier le nommage des entités créées par cette intégration.",
+        "data": {
+          "prefix": "Préfixe (laisser vide si inutile)",
+          "product_prefix": "Préfixer tous les capteurs avec le nom de la chaudière"
+        }
+      }
+    }
+  }
+}

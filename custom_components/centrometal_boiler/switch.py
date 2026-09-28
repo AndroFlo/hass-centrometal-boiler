@@ -33,4 +33,4 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         "Adding boiler control as switch: %s (%s)", entities, web_boiler_client.username
     )
     if len(entities) > 0:
-        async_add_entities(entities, True)
+        async_add_entities(entities)

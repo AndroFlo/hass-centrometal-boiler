@@ -1,6 +1,10 @@
 import logging
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.core import HomeAssistant
 
 from ..const import DOMAIN, WEB_BOILER_CLIENT, WEB_BOILER_SYSTEM
@@ -38,11 +42,15 @@ class WebBoilerGenericSensor(SensorEntity):
         self._serial = device["serial"]
         self._parameter_name = parameter["name"]
         self._product = device["product"]
-        if self.web_boiler_system.product_prefix == True:
+        if self.web_boiler_system.product_prefix:
             self._name = format_name(hass, device, f"{self._product} {self._description}")
         else:
             self._name = format_name(hass, device, self._description)
         self._unique_id = f"{self._serial}-{self._parameter_name}"
+        # A per-entity tag: a shared literal tag would make two entities
+        # subscribed to the same parameter silently overwrite each other.
+        self._callback_tag = f"generic_{self._unique_id}"
+        self._attr_state_class = self._derive_state_class()
         if disabled_by_default:
           self._attr_entity_registry_enabled_default = False
           self._attr_entity_registry_visible_default = False
@@ -53,14 +61,40 @@ class WebBoilerGenericSensor(SensorEntity):
             attribute_parameter = self.device.get_parameter(attribute)
             attribute_parameter["used"] = True
 
-    def __del__(self):
-        self.parameter.set_update_callback(None, "generic")
+    def _derive_state_class(self):
+        """Give numeric sensors a state class so they feed long-term statistics.
+
+        Counters (CNT_*) only ever grow and are reset when the boiler is
+        serviced, which is exactly TOTAL_INCREASING. Other numeric readings are
+        instantaneous measurements.
+        """
+        if self._device_class in (
+            SensorDeviceClass.ENUM,
+            SensorDeviceClass.DATE,
+            SensorDeviceClass.TIMESTAMP,
+        ):
+            return None
+        if self._parameter_name.startswith("CNT_"):
+            return SensorStateClass.TOTAL_INCREASING
+        if self._device_class is not None or self._unit:
+            return SensorStateClass.MEASUREMENT
+        return None
 
     async def async_added_to_hass(self):
         """Subscribe to sensor events."""
         self.added_to_hass = True
         self.async_schedule_update_ha_state(False)
-        self.parameter.set_update_callback(self.update_callback, "generic")
+        self.parameter.set_update_callback(self.update_callback, self._callback_tag)
+
+    async def async_will_remove_from_hass(self):
+        """Unsubscribe when the entity is removed.
+
+        __del__ is never reached: the callback registered on the parameter
+        holds a reference to this entity, so the garbage collector never
+        reclaims it while the subscription is alive.
+        """
+        self.added_to_hass = False
+        self.parameter.set_update_callback(None, self._callback_tag)
 
     @property
     def should_poll(self) -> bool:
@@ -99,7 +133,13 @@ class WebBoilerGenericSensor(SensorEntity):
     @property
     def native_value(self):
         """Return the value of the sensor."""
-        return self.parameter["value"]
+        value = self.parameter["value"]
+        # The boiler reports "?" until a parameter has actually been received.
+        # Returning it as-is makes Home Assistant complain about a non-numeric
+        # state on entities that declare a unit or a device class.
+        if value == "?" and (self._unit or self._device_class):
+            return None
+        return value
 
     @property
     def available(self):
