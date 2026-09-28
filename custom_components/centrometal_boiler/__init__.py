@@ -17,6 +17,7 @@ from homeassistant.const import (
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_call_later
 
 from .const import (
@@ -32,6 +33,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "switch", "binary_sensor"]
+
+# This integration is set up from the UI only, never from configuration.yaml.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 # pylint: disable=missing-function-docstring
 # pylint: disable=broad-except
