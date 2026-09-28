@@ -49,4 +49,4 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
         )
         entities.extend(WebBoilerGenericSensor.create_unknown_entities(hass, device))
 
-    async_add_entities(entities, True)
+    async_add_entities(entities)

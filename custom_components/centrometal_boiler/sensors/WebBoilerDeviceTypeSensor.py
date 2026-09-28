@@ -6,6 +6,11 @@ from centrometal_web_boiler.WebBoilerDeviceCollection import WebBoilerParameter
 
 
 class WebBoilerDeviceTypeSensor(WebBoilerGenericSensor):
+
+    def _derive_state_class(self):
+        """This sensor reports a textual state, so it has no state class."""
+        return None
+
     @property
     def available(self):
         """Return the availablity of the sensor."""
