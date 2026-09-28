@@ -1,6 +1,9 @@
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 import logging
+
+from centrometal_web_boiler.WebBoilerDeviceCollection import WebBoilerParameter
 
 from .WebBoilerGenericSensor import WebBoilerGenericSensor
 
@@ -11,18 +14,16 @@ class WebBoilerFuelPercentageSensor(WebBoilerGenericSensor):
     """Fuel percentage sensor that handles late arrival of B_razP parameter."""
 
     async def async_added_to_hass(self):
-        """Subscribe to events and check for real parameter."""
-        # Try to get the real parameter now
-        try:
-            if self._device.has_parameter("B_razP"):
-                self.parameter = self._device.get_parameter("B_razP")
+        """Subscribe to events, switching to the real parameter if it arrived."""
+        if self.device.has_parameter("B_razP"):
+            real_parameter = self.device.get_parameter("B_razP")
+            if real_parameter is not self.parameter:
+                self.parameter = real_parameter
+                self.parameter["used"] = True
                 _LOGGER.debug(
                     "WebBoilerFuelPercentageSensor connected to real B_razP parameter"
                 )
-        except Exception:
-            pass
 
-        # Call parent to set up subscription
         await super().async_added_to_hass()
 
     @property
@@ -33,26 +34,30 @@ class WebBoilerFuelPercentageSensor(WebBoilerGenericSensor):
         except (ValueError, TypeError, KeyError):
             return None
 
-    @property
-    def native_unit_of_measurement(self):
-        return "%"
-
     @staticmethod
     def create_entities(hass: HomeAssistant, device) -> list[SensorEntity]:
         entities = []
-        try:
+        if device.has_parameter("B_razP"):
             param = device.get_parameter("B_razP")
-        except Exception:
-            # Create with placeholder - will update when B_razP arrives
-            param = {"name": "B_razP", "value": 0, "used": True}
+        else:
+            # B_razP can show up after the entities are created. Use a real
+            # WebBoilerParameter as a placeholder: a plain dict would blow up in
+            # async_added_to_hass, which calls set_update_callback on it.
+            param = WebBoilerParameter()
+            param["name"] = "B_razP"
+            param["value"] = None
 
-        sensor = WebBoilerFuelPercentageSensor(
-            hass,
-            device,
-            ["%", "mdi:percent", None, "Fuel level"],
-            param,
+        entities.append(
+            WebBoilerFuelPercentageSensor(
+                hass,
+                device,
+                [
+                    PERCENTAGE,
+                    "mdi:percent",
+                    None,
+                    "Fuel level",
+                ],
+                param,
+            )
         )
-        # Store device reference for later parameter lookup
-        sensor._device = device
-        entities.append(sensor)
         return entities

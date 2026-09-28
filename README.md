@@ -1,44 +1,46 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
-![Maintenance](https://img.shields.io/maintenance/yes/2023.svg)
+[![Validate](https://github.com/AndroFlo/hass-centrometal-boiler/actions/workflows/validate.yml/badge.svg)](https://github.com/AndroFlo/hass-centrometal-boiler/actions/workflows/validate.yml)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
 # hass-centrometal-boiler
 
 Home Assistant custom component integration for Centrometal Boiler System (with CM WiFi-Box).
 
-To visualize boiler display as card use https://github.com/9a4gl/lovelace-centrometal-boiler-card card.
+To visualize the boiler display as a card, use the [lovelace-centrometal-boiler-card](https://github.com/9a4gl/lovelace-centrometal-boiler-card) card.
 
 ## About
 
-This component is based on https://github.com/9a4gl/py-centrometal-web-boiler library to connect to Centrometal web boiler system.
-The integration is created to support Centrometal Boiler System with CM WiFi-Box in Home Assistant.
+This component is based on the [py-centrometal-web-boiler](https://github.com/9a4gl/py-centrometal-web-boiler) library, which connects to the Centrometal web boiler system.
 
-This is based on analysis of Centrometal's web application. I have asked Centrometal for specification and support for integrating their boilers into Home Assistant. They have not replied to any of my 5 emails sent during March, April and May of 2021. After calling them by phone, they comfirmed receiving of my emails and promised to contact me back on Friday 16-Apr-2021, but that have not happened on 16-Apr-2021 or any date later so far. What a pity.
+This repository is a fork of [9a4gl/hass-centrometal-boiler](https://github.com/9a4gl/hass-centrometal-boiler), maintained at [AndroFlo/hass-centrometal-boiler](https://github.com/AndroFlo/hass-centrometal-boiler). Please report issues about this fork on [its own issue tracker](https://github.com/AndroFlo/hass-centrometal-boiler/issues).
+
+The integration is built on an analysis of Centrometal's web application; it is not an official integration and Centrometal provides no specification or support for it.
 
 ## Installation
 
-Requires Home Assistant core-2021.11.3 or newer.
+Requires Home Assistant **2024.11.2** or newer.
 
 ### Installation through HACS
 
-If you have not yet installed HACS, go get it at https://hacs.xyz/ and walk through the installation and configuration.
+If you have not installed HACS yet, get it at https://hacs.xyz/ and follow its installation and configuration steps.
 
-Use "https://github.com/9a4gl/hass-centrometal-boiler" as URL for a new HACS custom repository.
-
-Then find the Centrometal Boiler System integration in HACS and install it.
-
-Install the new integration through *Configuration -> Integrations* in HA (see below).
+1. In Home Assistant, open **HACS**.
+2. Open the three-dot menu in the top right corner and choose **Custom repositories**.
+3. Add `https://github.com/AndroFlo/hass-centrometal-boiler` as the repository and pick **Integration** as the category.
+4. Search for **Centrometal Boiler System** in HACS and install it.
+5. Restart Home Assistant.
+6. Add the integration through *Settings -> Devices & Services -> Add Integration*.
 
 ### Manual installation
 
-Copy the sub-path `/hass-centrometal-boiler/custom_components/centrometal_boiler` of this repo into the path `/config/custom_components/centrometal_boiler` of your HA installation.
+Copy the `custom_components/centrometal_boiler` folder of this repository into the `custom_components/centrometal_boiler` folder of your Home Assistant configuration, then restart Home Assistant.
 
-Alternatively use the following commands within an SSH shell into your HA system.
-Do NOT try to execute these commands directly your PC on a mounted HA file system. The resulting symlink would be broken for the HA file system.
+Alternatively, use the following commands from an SSH shell on your Home Assistant system. Do NOT run these directly on your PC against a mounted Home Assistant file system: the resulting symlink would be broken for Home Assistant.
+
 ```
 cd /config
-git clone https://github.com/9a4gl/hass-centrometal-boiler.git
+git clone https://github.com/AndroFlo/hass-centrometal-boiler.git
 
-# if folder custom_components does not yet exist:
+# if the custom_components folder does not exist yet:
 mkdir custom_components
 
 cd custom_components
@@ -47,35 +49,52 @@ ln -s ../hass-centrometal-boiler/custom_components/centrometal_boiler
 
 ## Configuration
 
-### Home Assistant
+Set the integration up from *Settings -> Devices & Services*, search for "Centrometal Boiler System" and enter the e-mail address and password of your Centrometal account.
 
-Setup under Integrations in Home Assistant, search for "Centrometal Boiler System". You need to enter e-mail and password.
+Two optional settings control how the created entities are named:
 
-Even though this integration can be installed and configured via the Home Assistant GUI (uses config flow), you might have to restart Home Assistant to get it working.
+* **Prefix** — prefixes every entity created by this integration. Useful when you run several accounts side by side.
+* **Prefix all sensors with the boiler's name** — includes the product name in every entity name. Enabled by default.
+
+Both can be changed later through the **Configure** button of the integration, without having to delete and recreate it.
+
+If your Centrometal password changes, Home Assistant asks you to enter the new one instead of leaving the integration in a broken state.
 
 ## Supported devices
 
-The following devices are supported, other may work with CM WiFi-Box.
+The following devices are supported; others may work with the CM WiFi-Box.
 
-* PelTec-lambda, Peltec
+* PelTec-lambda, PelTec
+* PelTec Compact
 * CentroPlus + Cm Pelet-set
 * BioTec-L
 * EKO-CK P + Cm Pelet-set
 * BioTec-Plus (also Morvan GMX EASY)
-* EKO-CKS Multi Plus ? (need tester) ?
+* EKO-CKS Multi Plus ? (needs a tester)
 
-## Services
+## Controlling the boiler
 
-`centrometal_boiler.turn`
-Start or stop the boiler..
+The boiler and its heating circuits are exposed as `switch` entities, so they are controlled with the standard Home Assistant switch services:
+
+```yaml
+# Start the boiler
+action: switch.turn_on
+target:
+  entity_id: switch.peltec_boiler_switch
+
+# Stop the boiler
+action: switch.turn_off
+target:
+  entity_id: switch.peltec_boiler_switch
+```
+
+The exact entity ids depend on the naming options described above.
 
 ## Development
 
 ### Debugging
 
-To enable debug logging for this integration and related libraries you
-can control this in your Home Assistant `configuration.yaml`
-file. Example:
+To enable debug logging for this integration and its library, add the following to your Home Assistant `configuration.yaml`:
 
 ```
 logger:
@@ -85,4 +104,6 @@ logger:
     centrometal_web_boiler: debug
 ```
 
-After a restart detailed log entries will appear in `/config/home-assistant.log`.
+After a restart, detailed log entries appear in `/config/home-assistant.log`.
+
+Home Assistant's own "Enable debug logging" button on the integration page also turns on the library logs, thanks to the `loggers` entry in the manifest.

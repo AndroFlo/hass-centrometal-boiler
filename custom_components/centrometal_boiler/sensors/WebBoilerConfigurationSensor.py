@@ -5,6 +5,11 @@ from .WebBoilerGenericSensor import WebBoilerGenericSensor
 
 
 class WebBoilerConfigurationSensor(WebBoilerGenericSensor):
+
+    def _derive_state_class(self):
+        """This sensor reports a textual state, so it has no state class."""
+        return None
+
     @property
     def native_value(self):
         """Return the value of the sensor."""
@@ -28,7 +33,7 @@ class WebBoilerConfigurationSensor(WebBoilerGenericSensor):
             ]
             try:
                 return configurations[int(self.parameter["value"])]
-            except Exception:
+            except (ValueError, TypeError, IndexError, KeyError):
                 pass
         return self.parameter["value"]
 

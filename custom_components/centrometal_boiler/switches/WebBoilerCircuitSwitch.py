@@ -1,15 +1,11 @@
-import asyncio
-
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 # pylint: disable=relative-beyond-top-level
 from ..const import DOMAIN, WEB_BOILER_CLIENT
-from ..common import create_device_info, format_name
+from ..common import create_device_info, format_name, format_time
 
 from homeassistant.components.switch import SwitchEntity
-
-import homeassistant.util.dt as dt_util
-from datetime import datetime
 
 
 class WebBoilerCircuitSwitch(SwitchEntity):
@@ -24,8 +20,6 @@ class WebBoilerCircuitSwitch(SwitchEntity):
         self._serial = device["serial"]
         self._name = format_name(hass, device, naslov)
         self._unique_id = device["serial"] + "_switch_" + str(dbindex)
-        self._state = None
-        self._error_message = ""
         self._dbindex = dbindex
         self._table_key = f"table_{dbindex}_switch"
         self._param_name_def = f"PDEF_{dbindex}_0"
@@ -41,19 +35,23 @@ class WebBoilerCircuitSwitch(SwitchEntity):
         self._param_off["used"] = True
         self._param_on["used"] = True
 
-    def __del__(self):
-        self._param_def.set_update_callback(None, self._table_key)
-        self._param_state.set_update_callback(None, self._table_key)
-        self._param_off.set_update_callback(None, self._table_key)
-        self._param_on.set_update_callback(None, self._table_key)
-
     async def async_added_to_hass(self):
         """Subscribe to events."""
         self.async_schedule_update_ha_state(False)
-        self._param_def.set_update_callback(self.update_callback, self._table_key)
-        self._param_state.set_update_callback(self.update_callback, self._table_key)
-        self._param_off.set_update_callback(self.update_callback, self._table_key)
-        self._param_on.set_update_callback(self.update_callback, self._table_key)
+        self._set_callback(self.update_callback)
+
+    async def async_will_remove_from_hass(self):
+        """Unsubscribe when the entity is removed."""
+        self._set_callback(None)
+
+    def _set_callback(self, callback):
+        for param in (
+            self._param_def,
+            self._param_state,
+            self._param_off,
+            self._param_on,
+        ):
+            param.set_update_callback(callback, self._table_key)
 
     @property
     def should_poll(self) -> bool:
@@ -79,7 +77,7 @@ class WebBoilerCircuitSwitch(SwitchEntity):
         """Return true if it is on."""
         try:
             return int(self._param_state["value"]) == int(self._param_on["value"])
-        except ValueError:
+        except (ValueError, TypeError, KeyError):
             return False
 
     @property
@@ -87,48 +85,51 @@ class WebBoilerCircuitSwitch(SwitchEntity):
         """Return True if the device is available."""
         return self.web_boiler_client.is_websocket_connected()
 
-    def error(self):
-        """Return the error message."""
-        return self._error_message
-
     @property
-    def device_state_attributes(self):
-        """Return the state attributes of the power switch."""
-        tzinfo = dt_util.get_time_zone(self.hass.config.time_zone)
+    def extra_state_attributes(self):
+        """Return the state attributes of the circuit switch."""
         last_updated = "?"
         if "timestamp" in self._param_state.keys():
-            last_updated_dt = datetime.fromtimestamp(
-                int(self._param_state["timestamp"])
+            last_updated = format_time(
+                self.hass, int(self._param_state["timestamp"])
             )
-            last_updated = last_updated_dt.astimezone(tzinfo).strftime(
-                "%d.%m.%Y %H:%M:%S"
+        return {"Last updated": last_updated}
+
+    async def async_turn_on(self, **kwargs):
+        await self._async_turn_circuit(True)
+
+    async def async_turn_off(self, **kwargs):
+        await self._async_turn_circuit(False)
+
+    async def _async_turn_circuit(self, value):
+        """Send the command, retrying once after a re-login."""
+        try:
+            succeeded = await self.web_boiler_client.turn_circuit(
+                self._device["serial"], self._dbindex, value
             )
-        attributes = {}
-        attributes["Last updated"] = last_updated
-        return attributes
+        except Exception as ex:
+            raise HomeAssistantError(
+                f"Failed to switch circuit {self._dbindex}: {ex}"
+            ) from ex
 
-    async def turn_circuit_on_off(self, value):
-        if not await self.web_boiler_client.turn_circuit(
-            self._device["serial"], self._dbindex, value
-        ):
-            self.web_boiler_client.relogin()
+        if succeeded:
+            return
 
-    async def turn_circuit_off(self):
-        await self.web_boiler_client.turn_circuit(
-            self._device["serial"], self._dbindex, False
-        )
+        # The session most likely expired: re-login and try once more.
+        await self.web_boiler_client.relogin()
+        try:
+            succeeded = await self.web_boiler_client.turn_circuit(
+                self._device["serial"], self._dbindex, value
+            )
+        except Exception as ex:
+            raise HomeAssistantError(
+                f"Failed to switch circuit {self._dbindex} after re-login: {ex}"
+            ) from ex
 
-    def turn_on(self, **kwargs):
-        asyncio.run_coroutine_threadsafe(
-            self.turn_circuit_on_off(True),
-            self.hass.loop,
-        )
-
-    def turn_off(self, **kwargs):
-        asyncio.run_coroutine_threadsafe(
-            self.turn_circuit_on_off(False),
-            self.hass.loop,
-        )
+        if not succeeded:
+            raise HomeAssistantError(
+                f"The Centrometal server refused to switch circuit {self._dbindex}"
+            )
 
     @property
     def device_info(self):

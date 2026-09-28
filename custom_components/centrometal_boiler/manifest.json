@@ -1,11 +1,14 @@
 {
   "domain": "centrometal_boiler",
   "name": "Centrometal Boiler System",
-  "version": "0.0.54",
+  "version": "0.0.55",
   "config_flow": true,
-  "documentation": "https://github.com/9a4gl/hass-centrometal-boiler",
-  "issue_tracker": "https://github.com/9a4gl/hass-centrometal-boiler/issues",
+  "documentation": "https://github.com/AndroFlo/hass-centrometal-boiler",
+  "issue_tracker": "https://github.com/AndroFlo/hass-centrometal-boiler/issues",
   "dependencies": [],
-  "codeowners": ["@9a4gl"],
+  "codeowners": ["@AndroFlo"],
+  "iot_class": "cloud_push",
+  "integration_type": "hub",
+  "loggers": ["centrometal_web_boiler"],
   "requirements": ["py-centrometal-web-boiler==0.0.58"]
 }
