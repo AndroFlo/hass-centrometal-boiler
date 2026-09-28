@@ -34,6 +34,36 @@ def test_manifest_has_required_fields():
     assert manifest["iot_class"] == "cloud_push"
 
 
+def test_manifest_keys_are_sorted_the_way_hassfest_wants():
+    """hassfest requires: domain, name, then the rest in alphabetical order."""
+    keys = list(_load(COMPONENT / "manifest.json"))
+    expected = ["domain", "name"] + sorted(
+        key for key in keys if key not in ("domain", "name")
+    )
+    assert keys == expected
+
+
+def test_manifest_declares_a_valid_integration_type():
+    manifest = _load(COMPONENT / "manifest.json")
+    assert manifest["integration_type"] in {
+        "device",
+        "entity",
+        "hardware",
+        "helper",
+        "hub",
+        "service",
+        "system",
+        "virtual",
+    }
+
+
+def test_setup_declares_a_config_schema():
+    """hassfest warns when async_setup exists without a CONFIG_SCHEMA."""
+    source = (COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    if "async def async_setup(" in source:
+        assert "CONFIG_SCHEMA" in source
+
+
 def test_manifest_version_is_sane():
     version = _load(COMPONENT / "manifest.json")["version"]
     parts = version.split(".")
