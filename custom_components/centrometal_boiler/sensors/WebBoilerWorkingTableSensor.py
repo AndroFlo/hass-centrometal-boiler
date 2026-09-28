@@ -8,6 +8,11 @@ from centrometal_web_boiler.WebBoilerDeviceCollection import WebBoilerParameter
 
 
 class WebBoilerWorkingTableSensor(WebBoilerGenericSensor):
+
+    def _derive_state_class(self):
+        """This sensor reports a textual state, so it has no state class."""
+        return None
+
     def __init__(
         self, hass: HomeAssistant, device, sensor_data, param_status, param_tables
     ) -> None:
@@ -18,9 +23,6 @@ class WebBoilerWorkingTableSensor(WebBoilerGenericSensor):
                 name = f"PVAL_{key}_{val}"
                 parameter = self.device.get_parameter(name)
                 parameter["used"] = True
-
-    def __del__(self):
-        self.set_callback_to_all_table_parameters(None)
 
     def set_callback_to_all_table_parameters(self, callback):
         for key in self.param_tables:
@@ -33,6 +35,11 @@ class WebBoilerWorkingTableSensor(WebBoilerGenericSensor):
         """Subscribe to sensor events."""
         await super().async_added_to_hass()
         self.set_callback_to_all_table_parameters(self.update_callback)
+
+    async def async_will_remove_from_hass(self):
+        """Unsubscribe when the entity is removed."""
+        await super().async_will_remove_from_hass()
+        self.set_callback_to_all_table_parameters(None)
 
     def getValue(self, table_key, dayIndex, i):
         name = "PVAL_" + table_key + "_" + str(dayIndex * 6 + i)
@@ -53,12 +60,11 @@ class WebBoilerWorkingTableSensor(WebBoilerGenericSensor):
         return self.format_time(val1) + "-" + self.format_time(val2)
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
-        attributes = super().device_state_attributes
+        attributes = dict(super().extra_state_attributes)
         days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        tableIndex = 1
-        for key in self.param_tables:
+        for tableIndex, key in enumerate(self.param_tables, start=1):
             for i in range(0, 7):  # iterate over days
                 day = days[i]
                 texts = [

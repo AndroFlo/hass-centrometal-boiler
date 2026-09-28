@@ -16,14 +16,17 @@ from homeassistant.const import (
 )
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_call_later
 
 from .const import (
+    CONF_PRODUCT_PREFIX,
     DOMAIN,
     WEB_BOILER_CLIENT,
     WEB_BOILER_SYSTEM,
     WEB_BOILER_LOGIN_RETRY_INTERVAL,
     WEB_BOILER_REFRESH_INTERVAL,
+    WEB_BOILER_UNSUBSCRIBE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,16 +40,15 @@ PLATFORMS = ["sensor", "switch", "binary_sensor"]
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the Centrometal Boiler System integration."""
 
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
+    hass.data.setdefault(DOMAIN, {})
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.debug("Setting up Centrometal Boiler System component")
 
-    prefix = entry.data[CONF_PREFIX] if (CONF_PREFIX in entry.data) else ""
-    product_prefix = entry.data['product_prefix'] if ('product_prefix' in entry.data) else True
+    prefix = entry.data.get(CONF_PREFIX, "")
+    product_prefix = entry.data.get(CONF_PRODUCT_PREFIX, True)
     web_boiler_system = WebBoilerSystem(
         hass,
         username=entry.data[CONF_EMAIL],
@@ -56,25 +58,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
 
     unique_id = entry.data[CONF_EMAIL]
+    hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][unique_id] = {}
     hass.data[DOMAIN][unique_id][WEB_BOILER_SYSTEM] = web_boiler_system
 
     if not await web_boiler_system.start():
-        _LOGGER.error(
-            "Got Access Denied Error when setting up Centrometal Boiler System: %s",
-            entry.data[CONF_EMAIL],
+        # Leave no half-initialized state behind: Home Assistant will retry the
+        # setup (or ask for new credentials) instead of showing an entry with
+        # zero entities.
+        await web_boiler_system.stop()
+        hass.data[DOMAIN].pop(unique_id, None)
+        raise ConfigEntryAuthFailed(
+            f"Cannot log in to the Centrometal web boiler server as {unique_id}"
         )
 
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, web_boiler_system.stop())
+    unsubscribe = []
 
-    async def schedule_tick() -> None:
-        async_call_later(hass, 1.0, fire_time_event)
+    async def async_stop_system(event) -> None:
+        await web_boiler_system.stop()
 
-    async def fire_time_event(target: float) -> None:
+    unsubscribe.append(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_system)
+    )
+
+    # The tick loop reschedules itself, so keep the latest handle around to be
+    # able to cancel it in async_unload_entry.
+    tick_handle = {"cancel": None}
+
+    def schedule_tick() -> None:
+        tick_handle["cancel"] = async_call_later(hass, 1.0, fire_time_event)
+
+    async def fire_time_event(target) -> None:
         await web_boiler_system.tick()
-        await schedule_tick()
+        schedule_tick()
 
-    await schedule_tick()
+    def cancel_tick() -> None:
+        if tick_handle["cancel"] is not None:
+            tick_handle["cancel"]()
+            tick_handle["cancel"] = None
+
+    unsubscribe.append(cancel_tick)
+    schedule_tick()
+
+    hass.data[DOMAIN][unique_id][WEB_BOILER_UNSUBSCRIBE] = unsubscribe
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -83,6 +109,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         + web_boiler_system.username
     )
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a Centrometal Boiler System config entry."""
+    unique_id = entry.data[CONF_EMAIL]
+
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unload_ok:
+        return False
+
+    entry_data = hass.data[DOMAIN].pop(unique_id, {})
+
+    for unsubscribe in entry_data.get(WEB_BOILER_UNSUBSCRIBE, []):
+        unsubscribe()
+
+    web_boiler_system = entry_data.get(WEB_BOILER_SYSTEM)
+    if web_boiler_system is not None:
+        await web_boiler_system.stop()
+
+    _LOGGER.debug("Centrometal Boiler System component unloaded %s", unique_id)
+    return True
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the config entry when its options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 class WebBoilerSystem:
@@ -106,19 +158,19 @@ class WebBoilerSystem:
         )
 
     async def on_parameter_updated(self, device, param, create=False):
+        # Boilers push hundreds of parameters continuously: keep this at debug
+        # level so the Home Assistant log stays usable.
+        if not _LOGGER.isEnabledFor(logging.DEBUG):
+            return
         action = "Create" if create else "update"
-        serial = device["serial"]
-        name = param["name"]
-        value = param["value"]
-        _LOGGER.info(
+        _LOGGER.debug(
             "%s %s %s = %s (%s)",
             action,
-            serial,
-            name,
-            value,
+            device["serial"],
+            param["name"],
+            param["value"],
             self.web_boiler_client.username,
         )
-        pass
 
     async def start(self):
         _LOGGER.debug(f"Starting Centrometal Boiler System {self.username}")
@@ -152,7 +204,17 @@ class WebBoilerSystem:
         _LOGGER.debug(
             f"Stopping Centrometal WebBoilerSystem {self.web_boiler_client.username}"
         )
-        return await self.web_boiler_client.close_websocket()
+        try:
+            await self.web_boiler_client.close_websocket()
+        except Exception as ex:
+            _LOGGER.debug("Error while closing the websocket: %s", ex)
+        # Closing the websocket alone leaks the aiohttp session, which shows up
+        # as "Unclosed client session" warnings when Home Assistant shuts down.
+        try:
+            await self.web_boiler_client.http_client.close_session()
+        except Exception as ex:
+            _LOGGER.debug("Error while closing the HTTP session: %s", ex)
+        return True
 
     async def tick(self):
         datenow = datetime.datetime.now()

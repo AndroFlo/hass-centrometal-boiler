@@ -31,7 +31,10 @@ def create_device_info(device) -> dict:
 def format_time(hass: HomeAssistant, timestamp, tzinfo=None):
     if tzinfo is None:
         tzinfo = dt_util.get_time_zone(hass.config.time_zone)
-    dt = datetime.fromtimestamp(timestamp)
+    # Build an aware datetime from the epoch: without tz= the value would be
+    # interpreted in the host time zone, which is wrong whenever the host
+    # differs from the one configured in Home Assistant (e.g. a UTC container).
+    dt = datetime.fromtimestamp(timestamp, tz=dt_util.UTC)
     return dt.astimezone(tzinfo).strftime("%d.%m.%Y %H:%M:%S")
 
 
@@ -44,5 +47,6 @@ def format_name(hass: HomeAssistant, device, name) -> str:
     if len(web_boiler_client.data.values()) > 1:
         name = f"{serial} {name}"
     if len(web_boiler_system.prefix) > 0:
-        return f"{web_boiler_system.prefix} {name}"
+        # prefix already ends with a space (see WebBoilerSystem.__init__).
+        return f"{web_boiler_system.prefix}{name}"
     return name

@@ -1,0 +1,27 @@
+name: Version bump
+
+on:
+  pull_request:
+    paths:
+      - "custom_components/**"
+
+jobs:
+  check-version:
+    name: Manifest version must change
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+        with:
+          fetch-depth: 0
+
+      - name: Ensure manifest.json version was bumped
+        run: |
+          MANIFEST=custom_components/centrometal_boiler/manifest.json
+          BASE=origin/${{ github.base_ref }}
+          BASE_VERSION=$(git show "$BASE:$MANIFEST" | python3 -c "import json,sys;print(json.load(sys.stdin)['version'])")
+          HEAD_VERSION=$(python3 -c "import json;print(json.load(open('$MANIFEST'))['version'])")
+          echo "base=$BASE_VERSION head=$HEAD_VERSION"
+          if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
+            echo "::error::custom_components/ changed but manifest.json version is still $HEAD_VERSION. HACS uses this field to offer updates, so it must be bumped."
+            exit 1
+          fi

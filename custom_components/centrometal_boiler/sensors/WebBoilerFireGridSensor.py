@@ -5,6 +5,11 @@ from .WebBoilerGenericSensor import WebBoilerGenericSensor
 
 
 class WebBoilerFireGridSensor(WebBoilerGenericSensor):
+
+    def _derive_state_class(self):
+        """This sensor reports a textual state, so it has no state class."""
+        return None
+
     def __init__(
         self, hass: HomeAssistant, device, sensor_data, param_ind, param_dir, param_max
     ) -> None:
@@ -13,16 +18,19 @@ class WebBoilerFireGridSensor(WebBoilerGenericSensor):
         self.param_max = param_max
         self.param_dir["used"] = True
         self.param_max["used"] = True
-
-    def __del__(self):
-        self.param_dir.set_update_callback(None, "firegrid")
-        self.param_max.set_update_callback(None, "firegrid")
+        self._firegrid_tag = f"firegrid_{self._unique_id}"
 
     async def async_added_to_hass(self):
         """Subscribe to sensor events."""
         await super().async_added_to_hass()
-        self.param_dir.set_update_callback(self.update_callback, "firegrid")
-        self.param_max.set_update_callback(self.update_callback, "firegrid")
+        self.param_dir.set_update_callback(self.update_callback, self._firegrid_tag)
+        self.param_max.set_update_callback(self.update_callback, self._firegrid_tag)
+
+    async def async_will_remove_from_hass(self):
+        """Unsubscribe when the entity is removed."""
+        await super().async_will_remove_from_hass()
+        self.param_dir.set_update_callback(None, self._firegrid_tag)
+        self.param_max.set_update_callback(None, self._firegrid_tag)
 
     @property
     def native_value(self):
@@ -31,19 +39,19 @@ class WebBoilerFireGridSensor(WebBoilerGenericSensor):
             value_ind = int(self.parameter["value"])
             value_max = int(self.param_max["value"])
             value_dir = int(self.param_dir["value"])
-        except Exception:
-            return "0"
-        if value_max < 0:
-            return "0"
+        except (ValueError, TypeError, KeyError):
+            return None
+        if value_max <= 0:
+            return None
         text = str(int(value_ind * 100 / value_max))
         if value_dir > 0:
             return "+" + text
         return "-" + text
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
-        attributes = super().device_state_attributes
+        attributes = dict(super().extra_state_attributes)
         attributes["Ind"] = self.parameter["value"]
         attributes["Max"] = self.param_max["value"]
         attributes["Dir"] = self.param_dir["value"]

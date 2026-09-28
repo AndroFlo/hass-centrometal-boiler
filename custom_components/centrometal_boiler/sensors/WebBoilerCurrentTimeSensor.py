@@ -7,13 +7,24 @@ from ..common import format_time
 
 
 class WebBoilerCurrentTimeSensor(WebBoilerGenericSensor):
+
+    def _derive_state_class(self):
+        """This sensor reports a textual state, so it has no state class."""
+        return None
+
     @property
     def native_value(self):
         """Return the value of the sensor."""
-        if self.parameter["value"] == "?":
-            return self.parameter["value"]
-        value = int(self.parameter["value"], 16)
-        return format_time(self.hass, value, UTC)
+        value = self.parameter["value"]
+        if value == "?":
+            return value
+        # The clock is pushed as a hexadecimal epoch and is missing until the
+        # first update arrives.
+        try:
+            timestamp = int(value, 16)
+        except (ValueError, TypeError):
+            return None
+        return format_time(self.hass, timestamp, UTC)
 
     @staticmethod
     def create_entities(hass: HomeAssistant, device) -> list[SensorEntity]:
