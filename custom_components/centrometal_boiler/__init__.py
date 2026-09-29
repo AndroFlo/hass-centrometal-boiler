@@ -32,7 +32,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "switch", "binary_sensor"]
+PLATFORMS = ["sensor", "switch", "binary_sensor", "button"]
 
 # This integration is set up from the UI only, never from configuration.yaml.
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)

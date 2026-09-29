@@ -88,6 +88,14 @@ target:
   entity_id: switch.peltec_boiler_switch
 ```
 
+On a BioTec-Plus, a `button` entity switches the boiler to pellet mode:
+
+```yaml
+action: button.press
+target:
+  entity_id: button.biotec_plus_pellet_mode
+```
+
 The exact entity ids depend on the naming options described above.
 
 ## Development

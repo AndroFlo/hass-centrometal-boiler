@@ -24,7 +24,7 @@ jamais HTTP/WebSocket directement : elle consomme `WebBoilerClient`.
 3. Une boucle `tick()` re-planifiée chaque seconde via `async_call_later` gère la résilience :
    relogin si le websocket est tombé (`WEB_BOILER_LOGIN_RETRY_INTERVAL` = 60 s), `refresh()`
    périodique sinon (`WEB_BOILER_REFRESH_INTERVAL` = 600 s).
-4. Les plateformes (`sensor`, `switch`, `binary_sensor`) itèrent sur `web_boiler_client.data.values()`
+4. Les plateformes (`sensor`, `switch`, `binary_sensor`, `button`) itèrent sur `web_boiler_client.data.values()`
    — un `device` par chaudière — et construisent les entités.
 
 ### Modèle push, jamais de polling
