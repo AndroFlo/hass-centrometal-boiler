@@ -15,9 +15,9 @@ from .sensors.WebBoilerWorkingTableSensor import WebBoilerWorkingTableSensor
 from .sensors.WebBoilerPelletLevelSensor import WebBoilerPelletLevelSensor
 from .sensors.WebBoilerFuelPercentageSensor import WebBoilerFuelPercentageSensor
 from .sensors.WebBoilerCurrentTimeSensor import WebBoilerCurrentTimeSensor
-from .sensors.WebBoilerFireGridSensor import WebBoilerFireGridSensor
 from .sensors.WebBoilerHeatingCircuitSensor import WebBoilerHeatingCircuitSensor
 
+from .common import supported_devices
 from .const import DOMAIN, WEB_BOILER_CLIENT
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
 
     unique_id = config_entry.data[CONF_EMAIL]
     web_boiler_client = hass.data[DOMAIN][unique_id][WEB_BOILER_CLIENT]
-    for device in web_boiler_client.data.values():
+    for device in supported_devices(web_boiler_client):
         entities.extend(WebBoilerGenericSensor.create_common_entities(hass, device))
         entities.extend(WebBoilerConfigurationSensor.create_entities(hass, device))
         entities.extend(WebBoilerCurrentTimeSensor.create_entities(hass, device))
@@ -38,11 +38,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
         entities.extend(
             WebBoilerHeatingCircuitSensor.create_heating_circuits_entities(hass, device)
         )
-        if device["type"] in ["peltec", "compact", "biopl"]:
-            entities.extend(WebBoilerPelletLevelSensor.create_entities(hass, device))
-            entities.extend(WebBoilerFuelPercentageSensor.create_entities(hass, device))
-        if device["type"] in ["peltec", "compact"]:
-            entities.extend(WebBoilerFireGridSensor.create_entities(hass, device))
+        entities.extend(WebBoilerPelletLevelSensor.create_entities(hass, device))
+        entities.extend(WebBoilerFuelPercentageSensor.create_entities(hass, device))
         entities.extend(WebBoilerGenericSensor.create_conf_entities(hass, device))
         entities.extend(
             WebBoilerGenericSensor.create_temperatures_entities(hass, device)

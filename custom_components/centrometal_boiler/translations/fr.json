@@ -7,7 +7,7 @@
     "error": {
       "cannot_connect": "Connexion impossible, veuillez réessayer.",
       "invalid_auth": "Identifiants invalides.",
-      "no_devices": "Aucune chaudière n'a été trouvée sur ce compte.",
+      "no_devices": "Aucune chaudière BioTec-Plus n'a été trouvée sur ce compte.",
       "too_many_requests": "Trop de requêtes, réessayez plus tard.",
       "unknown": "Erreur inattendue."
     },

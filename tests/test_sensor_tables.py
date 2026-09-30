@@ -95,32 +95,3 @@ def test_no_duplicate_descriptions_within_a_table(path):
                 f"the description {description!r}"
             )
             seen[description] = key
-
-
-def test_compact_table_only_pops_existing_keys():
-    """generic_sensors_compact.py removes PelTec sensors with pop(..., None).
-
-    A silent no-op would mean a Compact boiler exposing a sensor it does not
-    have, so check every popped key really exists upstream.
-    """
-    compact = SENSORS / "generic_sensors_compact.py"
-    peltec_keys = set()
-    for _, entries in _tables(SENSORS / "generic_sensors_peltec.py"):
-        peltec_keys |= {key for key, _ in entries}
-
-    tree = ast.parse(compact.read_text(encoding="utf-8"))
-    popped = [
-        node.args[0].value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "pop"
-        and node.args
-        and isinstance(node.args[0], ast.Constant)
-    ]
-    assert popped, "expected generic_sensors_compact.py to pop some keys"
-    for key in popped:
-        assert key in peltec_keys, (
-            f"generic_sensors_compact.py pops {key!r}, which no longer exists "
-            "in the PelTec tables: the removal is silently doing nothing"
-        )

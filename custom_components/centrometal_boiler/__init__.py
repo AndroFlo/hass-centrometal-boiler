@@ -23,6 +23,7 @@ from homeassistant.helpers.event import async_call_later
 from .const import (
     CONF_PRODUCT_PREFIX,
     DOMAIN,
+    SUPPORTED_DEVICE_TYPE,
     WEB_BOILER_CLIENT,
     WEB_BOILER_SYSTEM,
     WEB_BOILER_LOGIN_RETRY_INTERVAL,
@@ -197,6 +198,13 @@ class WebBoilerSystem:
                 raise Exception(
                     f"No device found to Centrometal web boiler server {self.username}"
                 )
+            for device in self.web_boiler_client.data.values():
+                if device["type"] != SUPPORTED_DEVICE_TYPE:
+                    _LOGGER.warning(
+                        "Boiler %s (%s) is ignored: only the BioTec-Plus is supported",
+                        device["serial"],
+                        device["product"],
+                    )
             await self.web_boiler_client.start_websocket(self.on_parameter_updated)
             await self.web_boiler_client.refresh()
             return True
