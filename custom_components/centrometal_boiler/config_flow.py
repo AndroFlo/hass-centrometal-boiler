@@ -43,7 +43,7 @@ class CentrometalBoilerConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAI
     @callback
     def async_get_options_flow(config_entry):
         """Return the options flow handler."""
-        return CentrometalBoilerOptionsFlowHandler(config_entry)
+        return CentrometalBoilerOptionsFlowHandler()
 
     async def _show_setup_form(self, errors=None):
         """Show the setup form to the user."""
@@ -116,11 +116,11 @@ class CentrometalBoilerConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAI
 
 
 class CentrometalBoilerOptionsFlowHandler(config_entries.OptionsFlow):
-    """Allow changing the naming options without recreating the entry."""
+    """Allow changing the naming options without recreating the entry.
 
-    def __init__(self, config_entry) -> None:
-        """Initialize the options flow."""
-        self.config_entry = config_entry
+    self.config_entry is provided by Home Assistant (a read-only property since 2024.11:
+    assigning it in __init__ fails).
+    """
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""

@@ -14,7 +14,7 @@
     "centrometal_web_boiler"
   ],
   "requirements": [
-    "py-centrometal-web-boiler-androflo==0.1.0"
+    "py-centrometal-web-boiler-androflo==0.2.0"
   ],
-  "version": "0.1.1"
+  "version": "0.2.0"
 }

@@ -21,3 +21,22 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -v
+
+  home-assistant:
+    name: Home Assistant
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v5"
+
+      - uses: "actions/setup-python@v6"
+        with:
+          python-version: "3.13"
+
+      - name: Install Home Assistant test harness and the integration requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tests_ha/requirements.txt
+          pip install $(python -c "import json; print(' '.join(json.load(open('custom_components/centrometal_boiler/manifest.json'))['requirements']))")
+
+      - name: Run the integration in Home Assistant against a fake Centrometal cloud
+        run: python -m pytest -c tests_ha/pytest.ini tests_ha -v

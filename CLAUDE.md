@@ -8,11 +8,9 @@ Fork de `9a4gl/hass-centrometal-boiler` (origin = `AndroFlo/hass-centrometal-boi
 
 ## Architecture
 
-Tout le code vit dans `custom_components/centrometal_boiler/`. Les tests sans dépendance
-(`tests/`) vérifient les fichiers de configuration et les invariants des tables de capteurs ;
-ils tournent sans Home Assistant ni compte Centrometal. La CI (`.github/workflows/`) lance la
-validation HACS, `hassfest`, les tests, et refuse une PR touchant `custom_components/` sans
-bump de `manifest.json`.
+Tout le code vit dans `custom_components/centrometal_boiler/`. Deux suites de tests (voir
+« Tester ») ; la CI (`.github/workflows/`) lance la validation HACS, `hassfest`, les deux suites,
+et refuse une PR touchant `custom_components/` sans bump de `manifest.json`.
 
 La connexion au cloud Centrometal est entièrement déléguée à la librairie externe
 `py-centrometal-web-boiler` — fork `AndroFlo`, publié sur PyPI sous `py-centrometal-web-boiler-androflo` (pin dans `manifest.json` → `requirements`). L'intégration ne parle
@@ -22,28 +20,39 @@ jamais HTTP/WebSocket directement : elle consomme `WebBoilerClient`.
 
 1. `config_flow.py` — saisie e-mail / mot de passe (+ préfixe optionnel), valide via `try_connection`.
    L'unique_id de l'entrée est l'e-mail.
-2. `__init__.py` / `WebBoilerSystem` — login, `get_configuration()`, puis `start_websocket()`.
-   Stocke le client et le système dans `hass.data[DOMAIN][email][WEB_BOILER_CLIENT | WEB_BOILER_SYSTEM]`.
-3. Une boucle `tick()` re-planifiée chaque seconde via `async_call_later` gère la résilience :
+2. `__init__.py` / `WebBoilerSystem` (une instance par compte) — login, `get_configuration()`,
+   puis `start_websocket()` (la connexion s'établit en tâche de fond, après la création des
+   entités). Stocke le client et le système dans
+   `hass.data[DOMAIN][email][WEB_BOILER_CLIENT | WEB_BOILER_SYSTEM]`.
+3. `WebBoilerSystem._on_connectivity` (callback de connectivité de la librairie) envoie le signal
+   dispatcher `const.connectivity_signal(email)` (écouté par le `binary_sensor`) et, à chaque
+   connexion, lance `refresh()` en tâche de fond (`entry.async_create_background_task`) : la
+   chaudière renvoie alors toutes ses valeurs sur le WebSocket.
+4. Une boucle `tick()` re-planifiée chaque seconde via `async_call_later` gère la résilience :
    relogin si le websocket est tombé (`WEB_BOILER_LOGIN_RETRY_INTERVAL` = 60 s), `refresh()`
-   périodique sinon (`WEB_BOILER_REFRESH_INTERVAL` = 600 s).
-4. Les plateformes (`sensor`, `switch`, `binary_sensor`, `button`) itèrent sur `web_boiler_client.data.values()`
-   — un `device` par chaudière — et construisent les entités.
+   périodique sinon (`WEB_BOILER_REFRESH_INTERVAL` = 600 s). `relogin()` ne lève jamais ; un mot de
+   passe refusé en cours de route lance le flux de ré-authentification.
+5. Les plateformes (`sensor`, `switch`, `binary_sensor`, `button`) itèrent sur
+   `common.supported_devices(client)` — un `device` par BioTec-Plus — et construisent les entités.
+6. Les commandes (interrupteurs, bouton granulés) passent toutes par
+   `WebBoilerSystem.async_send_command(what, send)` : envoi, sinon relogin et un nouvel essai, sinon
+   `HomeAssistantError`.
 
 ### Modèle push, jamais de polling
 
-Toutes les entités renvoient `should_poll = False`. La mise à jour passe par
-`parameter.set_update_callback(self.update_callback, "<tag>")` posé dans `async_added_to_hass`,
-et le callback appelle `async_write_ha_state()`. `available` reflète
-`web_boiler_client.is_websocket_connected()`.
+Toutes les entités héritent de `entity.py::WebBoilerEntity` : `should_poll = False`,
+`available` = WebSocket connecté, `device_info`, et l'abonnement aux paramètres. Une entité liste
+dans `_watched()` les paramètres qu'elle affiche ; la base s'y abonne dans `async_added_to_hass`
+(tag unique par entité, dérivé de l'`unique_id`) et appelle `async_write_ha_state()` à chaque mise
+à jour. À la connexion et à la déconnexion, la librairie notifie **tous** les paramètres : c'est ce
+qui rafraîchit la disponibilité. Une entité sans paramètre surveillé (cas de l'ancien bouton
+granulés) resterait donc indisponible si elle est créée avant la connexion — toujours surveiller
+au moins un paramètre.
 
 Le désabonnement se fait dans `async_will_remove_from_hass`, **jamais dans `__del__`** : le
-callback stocke une méthode liée dans le `parameter`, qui vit dans `hass.data`, donc l'entité
-n'est jamais collectée tant que l'abonnement est actif et `__del__` ne se déclencherait pas.
-
-Le tag est **unique par entité** (`self._callback_tag`, dérivé de l'`unique_id`). Un tag
-littéral partagé ferait qu'une entité écrase silencieusement le callback d'une autre abonnée
-au même paramètre.
+callback stocke une méthode liée dans le `parameter`, donc l'entité n'est jamais collectée tant
+que l'abonnement est actif. Un callback de dispatcher doit être décoré `@callback`, sinon HA
+l'exécute hors de la boucle et refuse `async_write_ha_state`.
 
 ### Paramètres device
 
@@ -74,13 +83,16 @@ de transformation (`WebBoilerPelletLevelSensor`, `WebBoilerWorkingTableSensor`,
 
 ### Cycle de vie de l'entrée
 
-`async_setup_entry` lève `ConfigEntryAuthFailed` si la connexion échoue, ce qui déclenche le
-flux de ré-authentification plutôt que de laisser une intégration vide. La boucle `tick`
+`WebBoilerSystem.start` lève `ConfigEntryNotReady` si le cloud est injoignable (HA réessaie seul),
+`ConfigEntryAuthFailed` si les identifiants sont refusés (flux de ré-authentification) et
+`ConfigEntryError` s'il n'y a pas de BioTec-Plus sur le compte. La librairie distingue les deux
+premiers cas : `login` renvoie `False` pour un refus et lève pour une panne. La boucle `tick`
 (relogin/refresh) se replanifie elle-même : son handle est conservé pour qu'`async_unload_entry`
 puisse l'annuler, sinon elle survivrait à la suppression de l'entrée. Tout ce qui doit être
 libéré est empilé dans `WEB_BOILER_UNSUBSCRIBE`.
 
-L'`OptionsFlow` permet de changer les options de nommage sans recréer l'entrée.
+L'`OptionsFlow` permet de changer les options de nommage sans recréer l'entrée. Ne pas lui
+passer ni assigner `config_entry` : c'est une propriété en lecture seule fournie par HA.
 
 ### Nommage des entités
 
@@ -112,7 +124,7 @@ qu'HACS propose comme version. Utiliser des versions sans suffixe : un tag suffi
 (`0.1.1-beta.1`) devient une pré-release, que HACS ne propose qu'avec « Show beta versions ».
 Le workflow `version-bump.yml` refuse une PR qui touche `custom_components/` sans ce bump.
 Si le changement dépend d'une évolution de la librairie, bumper aussi le pin
-`py-centrometal-web-boiler-androflo==0.0.x` dans `requirements` (la version doit déjà être sur PyPI).
+`py-centrometal-web-boiler-androflo==x.y.z` dans `requirements` (la version doit déjà être sur PyPI).
 
 Les entités n'exposent aucun service : la chaudière et ses circuits se pilotent via les
 services standard `switch.turn_on` / `switch.turn_off`. Ne pas documenter de service
@@ -120,11 +132,16 @@ services standard `switch.turn_on` / `switch.turn_off`. Ne pas documenter de ser
 
 ## Tester
 
-`python -m pytest tests/` — ne demande que `pytest`, et couvre les fichiers de configuration
-(manifest, alignement des traductions) et les invariants des tables de capteurs.
+- `python -m pytest tests/` — ne demande que `pytest` : fichiers de configuration (manifest,
+  traductions) et invariants des tables de capteurs.
+- `tests_ha/` — l'intégration dans un vrai Home Assistant (`pytest-homeassistant-custom-component`),
+  branchée sur un faux cloud Centrometal local (`tests_ha/fake_centrometal.py` : site + broker
+  STOMP) : setup, panne, mot de passe refusé, entités, disponibilité, reconnexion, commandes,
+  config flow et options. Lancer :
+  `pip install -r tests_ha/requirements.txt <requirements du manifest>` puis
+  `python -m pytest -c tests_ha/pytest.ini tests_ha`.
 
-Le comportement runtime (websocket, entités, config flow) demande en revanche une instance
-Home Assistant connectée à un vrai compte Centrometal.
+Seul l'effet réel des commandes sur la chaudière demande un vrai compte Centrometal.
 
 ## Débogage
 

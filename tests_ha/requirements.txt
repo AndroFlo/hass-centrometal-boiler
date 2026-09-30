@@ -1,0 +1,2 @@
+# Tests running the integration inside a real Home Assistant (see conftest.py)
+pytest-homeassistant-custom-component
