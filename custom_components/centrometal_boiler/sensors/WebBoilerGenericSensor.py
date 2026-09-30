@@ -135,9 +135,10 @@ class WebBoilerGenericSensor(SensorEntity):
         """Return the value of the sensor."""
         value = self.parameter["value"]
         # The boiler reports "?" until a parameter has actually been received.
-        # Returning it as-is makes Home Assistant complain about a non-numeric
-        # state on entities that declare a unit or a device class.
-        if value == "?" and (self._unit or self._device_class):
+        # Home Assistant refuses a non-numeric state on entities that declare a
+        # unit, a device class or a state class (the CNT_* counters have only
+        # the latter): it would not even add the entity.
+        if value == "?" and (self._unit or self._device_class or self._attr_state_class):
             return None
         return value
 
