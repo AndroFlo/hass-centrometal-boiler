@@ -7,7 +7,7 @@
     "error": {
       "cannot_connect": "Failed to connect, please try again.",
       "invalid_auth": "Invalid authentication.",
-      "no_devices": "No boiler was found on this account.",
+      "no_devices": "No BioTec-Plus boiler was found on this account.",
       "too_many_requests": "Too many requests, retry later.",
       "unknown": "Unexpected error."
     },

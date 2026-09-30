@@ -1,7 +1,7 @@
 """Support for Centrometal Boiler System."""
 
 from homeassistant.core import HomeAssistant
-from .common import create_device_info, format_name
+from .common import create_device_info, format_name, supported_devices
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -24,7 +24,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
 
     unique_id = config_entry.data[CONF_EMAIL]
     web_boiler_client = hass.data[DOMAIN][unique_id][WEB_BOILER_CLIENT]
-    for device in web_boiler_client.data.values():
+    for device in supported_devices(web_boiler_client):
         entities.append(WebBoilerWebsocketStatus(hass, web_boiler_client, device))
     async_add_entities(entities)
 
