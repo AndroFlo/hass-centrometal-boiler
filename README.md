@@ -9,7 +9,7 @@ To visualize the boiler display as a card, use the [lovelace-centrometal-boiler-
 
 ## About
 
-This component is based on the [py-centrometal-web-boiler](https://github.com/9a4gl/py-centrometal-web-boiler) library, which connects to the Centrometal web boiler system.
+This component is based on the [py-centrometal-web-boiler](https://github.com/AndroFlo/py-centrometal-web-boiler) library (fork published on PyPI as `py-centrometal-web-boiler-androflo`), which connects to the Centrometal web boiler system.
 
 This repository is a fork of [9a4gl/hass-centrometal-boiler](https://github.com/9a4gl/hass-centrometal-boiler), maintained at [AndroFlo/hass-centrometal-boiler](https://github.com/AndroFlo/hass-centrometal-boiler). Please report issues about this fork on [its own issue tracker](https://github.com/AndroFlo/hass-centrometal-boiler/issues).
 
