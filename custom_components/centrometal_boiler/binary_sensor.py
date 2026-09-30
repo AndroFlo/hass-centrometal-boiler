@@ -1,6 +1,6 @@
 """Support for Centrometal Boiler System."""
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from .common import create_device_info, format_name, supported_devices
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -86,6 +86,7 @@ class WebBoilerWebsocketStatus(BinarySensorEntity):
         """No polling needed for a sensor."""
         return False
 
+    @callback
     def update_callback(self, status):
         """Call update for Home Assistant when the connectivity changes."""
         self.async_write_ha_state()
