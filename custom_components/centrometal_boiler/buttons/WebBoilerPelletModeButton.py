@@ -19,6 +19,24 @@ class WebBoilerPelletModeButton(ButtonEntity):
         self._product = device["product"]
         self._name = format_name(hass, device, f"{self._product} Pellet Mode")
         self._unique_id = device["serial"] + "_button_pellet_mode"
+        # A button has no value of its own, but its availability follows the
+        # connection: listen to a parameter so the state is written again when
+        # the WebSocket connects (every parameter is notified then). Without
+        # it, a button created before the connection stays unavailable.
+        self._param = device.get_parameter("B_pbs")
+        self._callback_tag = f"button_{self._unique_id}"
+
+    async def async_added_to_hass(self):
+        """Subscribe to the connection updates."""
+        self._param.set_update_callback(self.update_callback, self._callback_tag)
+
+    async def async_will_remove_from_hass(self):
+        """Unsubscribe when the entity is removed."""
+        self._param.set_update_callback(None, self._callback_tag)
+
+    async def update_callback(self, parameter):
+        """Write the state again: the availability may have changed."""
+        self.async_write_ha_state()
 
     @property
     def should_poll(self) -> bool:
