@@ -24,22 +24,12 @@ class WebBoilerWorkingTableSensor(WebBoilerGenericSensor):
                 parameter = self.device.get_parameter(name)
                 parameter["used"] = True
 
-    def set_callback_to_all_table_parameters(self, callback):
-        for key in self.param_tables:
-            for val in self.param_tables[key]:
-                name = f"PVAL_{key}_{val}"
-                parameter = self.device.get_parameter(name)
-                parameter.set_update_callback(callback, f"table_{key}")
-
-    async def async_added_to_hass(self):
-        """Subscribe to sensor events."""
-        await super().async_added_to_hass()
-        self.set_callback_to_all_table_parameters(self.update_callback)
-
-    async def async_will_remove_from_hass(self):
-        """Unsubscribe when the entity is removed."""
-        await super().async_will_remove_from_hass()
-        self.set_callback_to_all_table_parameters(None)
+    def _watched(self) -> list:
+        return [self.parameter] + [
+            self.device.get_parameter(f"PVAL_{key}_{val}")
+            for key in self.param_tables
+            for val in self.param_tables[key]
+        ]
 
     def getValue(self, table_key, dayIndex, i):
         name = "PVAL_" + table_key + "_" + str(dayIndex * 6 + i)
