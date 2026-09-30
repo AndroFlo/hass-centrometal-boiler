@@ -1,8 +1,27 @@
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN, WEB_BOILER_CLIENT, WEB_BOILER_SYSTEM
+from .const import DOMAIN, SUPPORTED_DEVICE_TYPE, WEB_BOILER_CLIENT, WEB_BOILER_SYSTEM
 
 import homeassistant.util.dt as dt_util
 from datetime import datetime
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def supported_devices(web_boiler_client) -> list:
+    """Return the BioTec-Plus boilers of the account; other boilers are ignored."""
+    devices = []
+    for device in web_boiler_client.data.values():
+        if device["type"] == SUPPORTED_DEVICE_TYPE:
+            devices.append(device)
+        else:
+            _LOGGER.debug(
+                "Ignoring boiler %s (%s, type %s): only the BioTec-Plus is supported",
+                device["serial"],
+                device["product"],
+                device["type"],
+            )
+    return devices
 
 
 def create_device_info(device) -> dict:
@@ -44,7 +63,11 @@ def format_name(hass: HomeAssistant, device, name) -> str:
     serial = device["serial"]
     web_boiler_client = hass.data[DOMAIN][username][WEB_BOILER_CLIENT]
     web_boiler_system = hass.data[DOMAIN][username][WEB_BOILER_SYSTEM]
-    if len(web_boiler_client.data.values()) > 1:
+    # Ignored boilers do not count: one BioTec-Plus keeps the short names the card expects.
+    supported = [
+        d for d in web_boiler_client.data.values() if d["type"] == SUPPORTED_DEVICE_TYPE
+    ]
+    if len(supported) > 1:
         name = f"{serial} {name}"
     if len(web_boiler_system.prefix) > 0:
         # prefix already ends with a space (see WebBoilerSystem.__init__).
