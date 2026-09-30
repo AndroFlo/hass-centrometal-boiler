@@ -12,7 +12,7 @@ validation HACS, `hassfest`, les tests, et refuse une PR touchant `custom_compon
 bump de `manifest.json`.
 
 La connexion au cloud Centrometal est entièrement déléguée à la librairie externe
-`py-centrometal-web-boiler` (pin dans `manifest.json` → `requirements`). L'intégration ne parle
+`py-centrometal-web-boiler` — fork `AndroFlo`, publié sur PyPI sous `py-centrometal-web-boiler-androflo` (pin dans `manifest.json` → `requirements`). L'intégration ne parle
 jamais HTTP/WebSocket directement : elle consomme `WebBoilerClient`.
 
 ### Flux de données
@@ -104,7 +104,7 @@ Toute modification fonctionnelle doit s'accompagner d'un bump de `version` dans
 `manifest.json` — c'est ce champ que HACS lit pour proposer la mise à jour (schéma `0.0.x`).
 Le workflow `version-bump.yml` refuse une PR qui touche `custom_components/` sans ce bump.
 Si le changement dépend d'une évolution de la librairie, bumper aussi le pin
-`py-centrometal-web-boiler==0.0.x` dans `requirements`.
+`py-centrometal-web-boiler-androflo==0.0.x` dans `requirements` (la version doit déjà être sur PyPI).
 
 Les entités n'exposent aucun service : la chaudière et ses circuits se pilotent via les
 services standard `switch.turn_on` / `switch.turn_off`. Ne pas documenter de service
