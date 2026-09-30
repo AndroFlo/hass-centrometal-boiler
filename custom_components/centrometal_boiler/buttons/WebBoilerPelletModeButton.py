@@ -7,9 +7,6 @@ from ..const import DOMAIN, WEB_BOILER_CLIENT
 
 from homeassistant.components.button import ButtonEntity
 
-# Same payload shape as the power command (CMD), sent to /api/inst/control/<id>.
-PELLET_MODE_COMMAND = {"cmd-name": "SCCMD", "cmd-value": 1}
-
 
 class WebBoilerPelletModeButton(ButtonEntity):
     """Button switching a wood/pellet boiler to pellet mode."""
@@ -49,30 +46,16 @@ class WebBoilerPelletModeButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Send the command, retrying once after a re-login."""
-        if await self._async_send():
+        serial = self._device["serial"]
+        if await self.web_boiler_client.set_pellet_mode(serial):
             return
 
         # The session most likely expired: re-login and try once more.
         await self.web_boiler_client.relogin()
-        if not await self._async_send():
+        if not await self.web_boiler_client.set_pellet_mode(serial):
             raise HomeAssistantError(
-                f"The Centrometal server refused to switch the boiler "
-                f"{self._device['serial']} to pellet mode"
+                f"Failed to switch the boiler {serial} to pellet mode"
             )
-
-    async def _async_send(self) -> bool:
-        # py-centrometal-web-boiler has no public method for SCCMD yet.
-        http_client = self.web_boiler_client.http_client
-        try:
-            response = await http_client._control(
-                self._device["id"], PELLET_MODE_COMMAND
-            )
-        except Exception as ex:
-            raise HomeAssistantError(
-                f"Failed to switch the boiler {self._device['serial']} "
-                f"to pellet mode: {ex}"
-            ) from ex
-        return response.get("status") == "success"
 
     @property
     def device_info(self):

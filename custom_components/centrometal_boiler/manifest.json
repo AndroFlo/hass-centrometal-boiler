@@ -14,7 +14,7 @@
     "centrometal_web_boiler"
   ],
   "requirements": [
-    "py-centrometal-web-boiler==0.0.58"
+    "py-centrometal-web-boiler==0.0.59"
   ],
-  "version": "0.0.56"
+  "version": "0.0.57"
 }
