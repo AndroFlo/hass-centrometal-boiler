@@ -1,6 +1,9 @@
 # CLAUDE.md
 
-Intégration custom Home Assistant pour les chaudières Centrometal équipées d'une CM WiFi-Box.
+Intégration custom Home Assistant pour la chaudière Centrometal **BioTec-Plus** (aussi vendue
+sous le nom Morvan GMX EASY, type Centrometal `biopl`) équipée d'une CM WiFi-Box. Le support des
+autres modèles (PelTec, Compact, CM Pelet-set, BioTec-L) a été retiré : seules les chaudières
+renvoyées par `common.py::supported_devices` reçoivent des entités, les autres sont ignorées.
 Fork de `9a4gl/hass-centrometal-boiler` (origin = `AndroFlo/hass-centrometal-boiler`), distribué via HACS.
 
 ## Architecture
@@ -52,8 +55,8 @@ invisible par défaut. C'est le mécanisme de découverte des codes non encore m
 
 ### Tables de capteurs
 
-Les capteurs « génériques » sont déclarés en tables déclaratives dans `sensors/generic_sensors_*.py`,
-sélectionnées par `device["type"]` : `peltec`, `compact`, `cmpelet`, `biotec`, `biopl`.
+Les capteurs « génériques » sont déclarés en tables déclaratives : `sensors/generic_sensors_all.py`
+(communs) et `sensors/generic_sensors_biotec_plus.py` (BioTec-Plus).
 Format de valeur — une liste positionnelle, pas un dict :
 
 ```python
@@ -65,7 +68,7 @@ en `extra_state_attributes` ; ces paramètres sont eux aussi marqués `used`.
 
 Ajouter le support d'une valeur revient normalement à ajouter une ligne dans la bonne table —
 pas à écrire une classe. Une classe dédiée dans `sensors/` n'est justifiée que pour une logique
-de transformation (`WebBoilerFireGridSensor`, `WebBoilerWorkingTableSensor`,
+de transformation (`WebBoilerPelletLevelSensor`, `WebBoilerWorkingTableSensor`,
 `WebBoilerFuelPercentageSensor` qui gère l'arrivée tardive de `B_razP`…) ; elle hérite alors de
 `WebBoilerGenericSensor` et surcharge `native_value` / `create_entities`.
 
@@ -101,7 +104,12 @@ changer pour une entité existante, cela casserait les installations en place.
 ## Publier une modification
 
 Toute modification fonctionnelle doit s'accompagner d'un bump de `version` dans
-`manifest.json` — c'est ce champ que HACS lit pour proposer la mise à jour (schéma `0.0.x`).
+`manifest.json` — c'est ce champ que HACS lit pour proposer la mise à jour.
+
+Pour publier, pousser un tag égal à la `version` du manifest (`git tag 0.1.1 && git push origin
+0.1.1`) : `.github/workflows/release.yml` vérifie la correspondance et crée la release GitHub,
+qu'HACS propose comme version. Utiliser des versions sans suffixe : un tag suffixé
+(`0.1.1-beta.1`) devient une pré-release, que HACS ne propose qu'avec « Show beta versions ».
 Le workflow `version-bump.yml` refuse une PR qui touche `custom_components/` sans ce bump.
 Si le changement dépend d'une évolution de la librairie, bumper aussi le pin
 `py-centrometal-web-boiler-androflo==0.0.x` dans `requirements` (la version doit déjà être sur PyPI).

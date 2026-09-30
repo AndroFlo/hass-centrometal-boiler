@@ -10,7 +10,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_ID, CONF_PASSWORD, CONF_PREFIX
 from homeassistant.core import callback
 
-from .const import CONF_PRODUCT_PREFIX, DOMAIN
+from .const import CONF_PRODUCT_PREFIX, DOMAIN, SUPPORTED_DEVICE_TYPE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -174,7 +174,10 @@ async def try_connection(email, password):
                 f"Getting devices from Centrometal boiler server failed {email}"
             )
 
-        if len(web_boiler_client.data) == 0:
+        if not any(
+            device["type"] == SUPPORTED_DEVICE_TYPE
+            for device in web_boiler_client.data.values()
+        ):
             raise NoDeviceFound(
                 f"No device found on Centrometal boiler server {email}"
             )

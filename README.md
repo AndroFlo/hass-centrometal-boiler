@@ -3,9 +3,9 @@
 
 # hass-centrometal-boiler
 
-Home Assistant custom component integration for Centrometal Boiler System (with CM WiFi-Box).
+Home Assistant custom component integration for the Centrometal **BioTec-Plus** boiler (also sold as **Morvan GMX EASY**) with a CM WiFi-Box.
 
-To visualize the boiler display as a card, use the [lovelace-centrometal-boiler-card](https://github.com/9a4gl/lovelace-centrometal-boiler-card) card.
+To visualize the boiler display as a card, use the [lovelace-centrometal-boiler-card](https://github.com/AndroFlo/lovelace-centrometal-boiler-card) card.
 
 ## About
 
@@ -62,15 +62,10 @@ If your Centrometal password changes, Home Assistant asks you to enter the new o
 
 ## Supported devices
 
-The following devices are supported; others may work with the CM WiFi-Box.
-
-* PelTec-lambda, PelTec
-* PelTec Compact
-* CentroPlus + Cm Pelet-set
-* BioTec-L
-* EKO-CK P + Cm Pelet-set
-* BioTec-Plus (also Morvan GMX EASY)
-* EKO-CKS Multi Plus ? (needs a tester)
+Only the **BioTec-Plus** (also Morvan GMX EASY, Centrometal type `biopl`) is supported.
+Other boilers of the account are ignored (a warning is logged at startup). The PelTec, Compact,
+CM Pelet-set and BioTec-L support of the upstream integration was removed; use
+[9a4gl/hass-centrometal-boiler](https://github.com/9a4gl/hass-centrometal-boiler) for those boilers.
 
 ## Controlling the boiler
 
@@ -80,15 +75,15 @@ The boiler and its heating circuits are exposed as `switch` entities, so they ar
 # Start the boiler
 action: switch.turn_on
 target:
-  entity_id: switch.peltec_boiler_switch
+  entity_id: switch.biotec_plus_boiler_switch
 
 # Stop the boiler
 action: switch.turn_off
 target:
-  entity_id: switch.peltec_boiler_switch
+  entity_id: switch.biotec_plus_boiler_switch
 ```
 
-On a BioTec-Plus, a `button` entity switches the boiler to pellet mode:
+A `button` entity switches the boiler from wood to pellet mode (there is no remote command back to wood):
 
 ```yaml
 action: button.press

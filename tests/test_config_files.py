@@ -5,6 +5,7 @@ catch the packaging mistakes that used to slip through (a missing iot_class,
 translations drifting apart from the config flow schema).
 """
 import json
+import re
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -65,10 +66,9 @@ def test_setup_declares_a_config_schema():
 
 
 def test_manifest_version_is_sane():
+    """X.Y.Z, optionally followed by a pre-release suffix (0.1.0-beta.1) for HACS betas."""
     version = _load(COMPONENT / "manifest.json")["version"]
-    parts = version.split(".")
-    assert len(parts) == 3, version
-    assert all(part.isdigit() for part in parts), version
+    assert re.fullmatch(r"\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?", version), version
 
 
 def test_hacs_manifest_matches():
