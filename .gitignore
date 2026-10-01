@@ -131,3 +131,6 @@ dmypy.json
 # macOS
 .DS_Store
 *.textClipping
+
+# Local assistant context, not for the public repo
+CLAUDE.md
