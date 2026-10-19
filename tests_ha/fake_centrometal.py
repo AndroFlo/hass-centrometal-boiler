@@ -81,6 +81,7 @@ BIOTEC_BUFFER = boiler(
         "B_P1": "0",
         "B_zahP1": "0",
         "C1B_Tpol": "45",
+        "C1B_Tsob": "21",
         "C1B_P": "1",
         "PVAL_72_0": "1",
         "PMIN_72_0": "0",

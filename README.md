@@ -120,6 +120,12 @@ The heat demand is a single loss coefficient against the indoor/outdoor differen
 power (kW) = loss coefficient (kW/K) x (indoor target - outdoor) + hot water
 ```
 
+The indoor target is read from the boiler itself (`C1B_Tsob`, the heating circuit's
+room setpoint), so it follows the circuit's own day and night programme instead of
+staying on one configured number. The option is the fallback for an installation
+without a room unit, and a reading outside 5-35 degrees is ignored as implausible.
+Both the value used and where it came from are published as attributes.
+
 That demand is projected forward over the weather forecast (the boiler's own outdoor probe is used
 for the present and blended into the forecast over two hours) until the energy runs out. The
 relight time is that moment minus the ignition delay and the safety margin, moved back into the
@@ -156,7 +162,9 @@ This is an estimate, and it is worth knowing where it is weak:
 * The building's inertia is ignored: a swing in the forecast shows up in the prediction faster than
   the house would actually feel it.
 * The tank's own standing losses (~4 %/day) are ignored, and hot water is a flat daily figure.
-* The boiler's own time programme is not read; a single night setback factor approximates it.
+* The boiler's time programme is only read through its current room setpoint, so a
+  setback already in effect is seen, but one starting later in the evening is not;
+  the night factor still approximates that.
 * While a fire is burning the prediction is suspended: the tank is gaining energy, so projecting a
   decay would be meaningless.
 

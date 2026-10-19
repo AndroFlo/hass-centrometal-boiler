@@ -87,6 +87,9 @@ PARAM_SECOND_PUMP = "B_P2"
 # The flow setpoint follows the boiler's heating curve, which is what the tank must
 # stay above; it is the default reference for the low threshold.
 PARAM_FLOW_TARGET = "C1B_Tpol"
+# The room setpoint the boiler itself works to, including its own day/night
+# programme. Preferred over the configured value, which cannot follow a setback.
+PARAM_ROOM_TARGET = "C1B_Tsob"
 
 WATCHED_FOR_EVENTS = (PARAM_BUFFER_TOP, PARAM_BUFFER_BOTTOM, PARAM_BOILER_PUMP)
 
@@ -168,6 +171,8 @@ class BufferPrediction:
     buffer_mean_temperature: float | None = None
     threshold_temperature: float | None = None
     threshold_source: str | None = None
+    indoor_target: float | None = None
+    indoor_target_source: str | None = None
     outdoor_temperature: float | None = None
     outdoor_temperature_source: str | None = None
     weather_fallback: bool = False
@@ -196,6 +201,8 @@ class BufferPrediction:
             "buffer_mean_temperature": _round(self.buffer_mean_temperature, 1),
             "threshold_temperature": _round(self.threshold_temperature, 1),
             "threshold_source": self.threshold_source,
+            "indoor_target": _round(self.indoor_target, 1),
+            "indoor_target_source": self.indoor_target_source,
             "outdoor_temperature": _round(self.outdoor_temperature, 1),
             "outdoor_temperature_source": self.outdoor_temperature_source,
             "weather_fallback": self.weather_fallback,
@@ -440,18 +447,19 @@ class BufferPredictionCalculator:
         )
 
         charging = self._charging(top)
+        indoor_target, indoor_source = self._indoor_target()
         projection = model.project_depletion(
             energy,
             now,
             forecast,
             probe,
             settings.loss_coefficient,
-            settings.indoor_target,
+            indoor_target,
             settings.night_factor,
             settings.night_start,
             settings.night_end,
             settings.dhw_power_kw,
-            heating_off=self._heating_off(probe),
+            heating_off=self._heating_off(probe, indoor_target),
             to_local=dt_util.as_local,
         )
 
@@ -462,6 +470,8 @@ class BufferPredictionCalculator:
             "buffer_mean_temperature": mean,
             "threshold_temperature": threshold,
             "threshold_source": threshold_source,
+            "indoor_target": indoor_target,
+            "indoor_target_source": indoor_source,
             "outdoor_temperature": probe if probe is not None else model.interpolate_forecast(forecast, now),
             "outdoor_temperature_source": outdoor_source,
             "weather_fallback": not forecast,
@@ -537,6 +547,18 @@ class BufferPredictionCalculator:
             return setpoint + self.settings.threshold_offset, f"boiler: {PARAM_FLOW_TARGET}"
         return self.settings.threshold, "fixed"
 
+    def _indoor_target(self) -> tuple[float, str]:
+        """The indoor temperature the heating is working towards.
+
+        The boiler already knows it, and its value follows the circuit's own day
+        and night programme, which the configured number cannot. The option stays
+        as the fallback for an installation without a room unit.
+        """
+        setpoint = _number(self.device, PARAM_ROOM_TARGET)
+        if setpoint is not None and 5.0 <= setpoint <= 35.0:
+            return setpoint, f"boiler: {PARAM_ROOM_TARGET}"
+        return self.settings.indoor_target, "configured"
+
     def _charging(self, tank_top: float) -> bool:
         """Whether a fire is currently charging the tank.
 
@@ -568,9 +590,9 @@ class BufferPredictionCalculator:
             self._last_charging_seen = None
         return False
 
-    def _heating_off(self, probe: float | None) -> bool:
+    def _heating_off(self, probe: float | None, indoor_target: float) -> bool:
         """Mid-season pause: no circuit pump running while it is mild outside."""
-        if probe is None or probe < self.settings.indoor_target:
+        if probe is None or probe < indoor_target:
             return False
         has_pump = self.device.has_parameter(PARAM_CIRCUIT_PUMP) or self.device.has_parameter(
             PARAM_SECOND_PUMP

@@ -142,19 +142,20 @@ async def test_entities_are_created_when_enabled(hass, predicting):
 
 
 async def test_nominal_prediction(hass, predicting):
-    """70/50 C tank, 45 C flow setpoint +3 K, 0 C outside, 0.3 kW/K."""
-    # Usable: mean 60 C - 48 C = 12 K over 1000 L = 13.96 kWh, drawn at 6 kW
+    """70/50 C tank, 45 C flow setpoint +3 K, 21 C indoors, 0 C outside, 0.3 kW/K."""
+    # Usable: mean 60 C - 48 C = 12 K over 1000 L = 13.96 kWh, drawn at 6.3 kW
     energy = float(state(hass, ENERGY))
     assert energy == pytest.approx(13.96, abs=0.05)
 
     data = attributes(hass, AUTONOMY)
-    assert data["estimated_power_kw"] == pytest.approx(6.0, abs=0.05)
+    # 0.3 kW/K x (21 - 0): the setpoint comes from the boiler (C1B_Tsob), not the option
+    assert data["estimated_power_kw"] == pytest.approx(6.3, abs=0.05)
     assert data["threshold_temperature"] == pytest.approx(48.0)
     assert data["threshold_source"] == "boiler: C1B_Tpol"
     assert data["status"] == "ok"
 
     autonomy = float(state(hass, AUTONOMY))
-    assert autonomy == pytest.approx(13.96 / 6.0, abs=0.3)
+    assert autonomy == pytest.approx(13.96 / 6.3, abs=0.3)
 
     # Relight is the depletion, minus the ignition delay and the safety margin
     # (the published timestamp is rounded to the second).
@@ -211,6 +212,39 @@ async def test_a_broken_threshold_entity_falls_back(hass, predicting):
     data = attributes(hass, AUTONOMY)
     assert data["threshold_source"] == "boiler: C1B_Tpol"
     assert data["status"] == "ok"
+
+
+# ------------------------------------------------------- indoor temperature
+
+
+async def test_the_indoor_target_comes_from_the_boiler(hass, predicting):
+    """The boiler knows the room setpoint, including its own day/night programme."""
+    data = attributes(hass, AUTONOMY)
+    assert data["indoor_target"] == pytest.approx(21.0)  # C1B_Tsob, not the 20.0 option
+    assert data["indoor_target_source"] == "boiler: C1B_Tsob"
+
+
+async def test_a_raised_indoor_target_shortens_the_autonomy(hass, predicting, broker):
+    """A warmer house draws more power, so the tank empties sooner.
+
+    The gap has to clear one 15-minute projection step to be visible at all: from
+    21 to 28 degrees the demand goes from 6.4 to 8.5 kW, which is about 30 minutes
+    on this tank.
+    """
+    before = float(state(hass, AUTONOMY))
+    await publish(hass, broker, {"C1B_Tsob": "28"})
+    after = float(state(hass, AUTONOMY))
+    assert after < before
+    assert attributes(hass, AUTONOMY)["indoor_target"] == pytest.approx(28.0)
+
+
+@pytest.mark.parametrize("predicting", [{"indoor_target_temperature": 18.0}], indirect=True)
+async def test_an_absurd_room_setpoint_falls_back_to_the_option(hass, predicting, broker):
+    """A probe reading 0 must not silently turn the heating demand off."""
+    await publish(hass, broker, {"C1B_Tsob": "0"})
+    data = attributes(hass, AUTONOMY)
+    assert data["indoor_target"] == pytest.approx(18.0)
+    assert data["indoor_target_source"] == "configured"
 
 
 # ---------------------------------------------------------------- weather
