@@ -35,10 +35,39 @@
   "options": {
     "step": {
       "init": {
+        "description": "Choisissez ce que vous souhaitez modifier.",
+        "menu_options": {
+          "naming": "Nommage des entités",
+          "prediction": "Prédiction de rallumage du ballon tampon"
+        }
+      },
+      "naming": {
         "description": "Modifier le nommage des entités créées par cette intégration.",
         "data": {
           "prefix": "Préfixe (laisser vide si inutile)",
           "product_prefix": "Préfixer tous les capteurs avec le nom de la chaudière"
+        }
+      },
+      "prediction": {
+        "description": "Prédit le moment où il faut rallumer le feu de bois pour que le ballon tampon ne soit jamais à plat. Le modèle est volontairement simple : partez des valeurs par défaut, puis comparez les attributs « puissance observée » et « puissance estimée » des nouveaux capteurs et ajustez le coefficient de déperdition jusqu'à ce qu'ils coïncident.",
+        "data": {
+          "prediction_enabled": "Activer la prédiction de rallumage",
+          "buffer_volume": "Volume du ballon tampon (litres)",
+          "building_loss_coefficient": "Coefficient de déperdition du bâtiment (kW par K)",
+          "indoor_target_temperature": "Température intérieure de consigne (°C)",
+          "weather_entity": "Entité météo utilisée pour la prévision",
+          "buffer_threshold_entity": "Entité donnant la température sous laquelle le ballon ne chauffe plus (la consigne de départ du circuit est utilisée si vide)",
+          "buffer_threshold": "Valeur fixe de repli pour cette température (°C)",
+          "buffer_threshold_offset": "Marge ajoutée à cette température (K)",
+          "ignition_delay": "Délai entre l'allumage et la charge effective du ballon (minutes)",
+          "safety_margin": "Marge de sécurité supplémentaire (minutes)",
+          "relight_window_start": "Heure la plus tôt pour allumer le feu",
+          "relight_window_end": "Heure la plus tard pour allumer le feu",
+          "stratification_factor": "Poids de la sonde haute dans la moyenne du ballon (0 à 1)",
+          "dhw_daily_energy": "Eau chaude sanitaire prélevée sur le ballon (kWh par jour)",
+          "night_reduction_factor": "Facteur de réduit de nuit (1 = pas de réduit)",
+          "night_start": "Début du réduit de nuit",
+          "night_end": "Fin du réduit de nuit"
         }
       }
     }

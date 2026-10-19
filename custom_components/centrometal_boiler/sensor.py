@@ -17,8 +17,10 @@ from .sensors.WebBoilerFuelPercentageSensor import WebBoilerFuelPercentageSensor
 from .sensors.WebBoilerCurrentTimeSensor import WebBoilerCurrentTimeSensor
 from .sensors.WebBoilerHeatingCircuitSensor import WebBoilerHeatingCircuitSensor
 
+from .sensors import WebBoilerBufferPredictionSensor
+
 from .common import supported_devices
-from .const import DOMAIN, WEB_BOILER_CLIENT
+from .const import DOMAIN, WEB_BOILER_CLIENT, WEB_BOILER_PREDICTION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
 
     unique_id = config_entry.data[CONF_EMAIL]
     web_boiler_client = hass.data[DOMAIN][unique_id][WEB_BOILER_CLIENT]
+    calculators = hass.data[DOMAIN][unique_id].get(WEB_BOILER_PREDICTION, {})
     for device in supported_devices(web_boiler_client):
         entities.extend(WebBoilerGenericSensor.create_common_entities(hass, device))
         entities.extend(WebBoilerConfigurationSensor.create_entities(hass, device))
@@ -44,6 +47,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
         entities.extend(
             WebBoilerGenericSensor.create_temperatures_entities(hass, device)
         )
+        calculator = calculators.get(device["serial"])
+        if calculator is not None:
+            entities.extend(
+                WebBoilerBufferPredictionSensor.create_entities(hass, device, calculator)
+            )
+        # Last: every parameter consumed above is marked used, the rest become
+        # disabled "{?} CODE" discovery sensors.
         entities.extend(WebBoilerGenericSensor.create_unknown_entities(hass, device))
 
     async_add_entities(entities)

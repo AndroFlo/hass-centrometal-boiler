@@ -23,16 +23,23 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
 
+from .common import supported_devices
 from .const import (
     CONF_PRODUCT_PREFIX,
     DOMAIN,
     SUPPORTED_DEVICE_TYPE,
     WEB_BOILER_CLIENT,
     WEB_BOILER_LOGIN_RETRY_INTERVAL,
+    WEB_BOILER_PREDICTION,
     WEB_BOILER_REFRESH_INTERVAL,
     WEB_BOILER_SYSTEM,
     WEB_BOILER_UNSUBSCRIBE,
     connectivity_signal,
+)
+from .prediction import (
+    BufferPredictionCalculator,
+    has_buffer_tank,
+    prediction_enabled,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -91,6 +98,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     unsubscribe.append(cancel_tick)
     schedule_tick()
+
+    # Relight prediction, opt-in and only for boilers that report a buffer tank.
+    # Built before the platforms are set up: they look the calculators up here.
+    calculators = {}
+    if prediction_enabled(entry):
+        for device in supported_devices(web_boiler_system.web_boiler_client):
+            if not has_buffer_tank(device):
+                _LOGGER.debug(
+                    "No buffer tank on %s: relight prediction not created",
+                    device["serial"],
+                )
+                continue
+            calculator = BufferPredictionCalculator(hass, device, entry)
+            calculators[device["serial"]] = calculator
+            unsubscribe.append(calculator.async_start())
+    hass.data[DOMAIN][unique_id][WEB_BOILER_PREDICTION] = calculators
 
     hass.data[DOMAIN][unique_id][WEB_BOILER_UNSUBSCRIBE] = unsubscribe
 

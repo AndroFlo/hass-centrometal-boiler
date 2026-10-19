@@ -8,8 +8,14 @@ from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
+from .binary_sensors.WebBoilerRelightAlert import WebBoilerRelightAlert
 from .common import format_name, supported_devices
-from .const import DOMAIN, WEB_BOILER_CLIENT, connectivity_signal
+from .const import (
+    DOMAIN,
+    WEB_BOILER_CLIENT,
+    WEB_BOILER_PREDICTION,
+    connectivity_signal,
+)
 from .entity import WebBoilerEntity
 
 
@@ -18,8 +24,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
 
     unique_id = config_entry.data[CONF_EMAIL]
     web_boiler_client = hass.data[DOMAIN][unique_id][WEB_BOILER_CLIENT]
+    calculators = hass.data[DOMAIN][unique_id].get(WEB_BOILER_PREDICTION, {})
     for device in supported_devices(web_boiler_client):
         entities.append(WebBoilerWebsocketStatus(hass, device))
+        calculator = calculators.get(device["serial"])
+        if calculator is not None:
+            entities.append(WebBoilerRelightAlert(hass, device, calculator))
     async_add_entities(entities)
 
 

@@ -88,3 +88,44 @@ async def wait_until(condition, timeout=3.0):
     async with asyncio.timeout(timeout):
         while not condition():
             await asyncio.sleep(0.05)
+
+
+@pytest.fixture
+def forecast_temperatures():
+    """Hourly outdoor temperatures the fake weather integration will report."""
+    return [0.0] * 49
+
+
+@pytest.fixture
+def weather(hass, forecast_temperatures):
+    """A weather entity answering weather.get_forecasts, like a real integration.
+
+    Mocking the service rather than wiring a whole weather integration keeps the
+    test on the contract the prediction actually consumes.
+    """
+    from datetime import timedelta
+
+    from homeassistant.core import SupportsResponse
+    import homeassistant.util.dt as dt_util
+
+    entity_id = "weather.test"
+    hass.states.async_set(entity_id, "cloudy", {"temperature": forecast_temperatures[0]})
+
+    async def get_forecasts(call):
+        start = dt_util.utcnow()
+        return {
+            entity_id: {
+                "forecast": [
+                    {
+                        "datetime": (start + timedelta(hours=hour)).isoformat(),
+                        "temperature": temperature,
+                    }
+                    for hour, temperature in enumerate(forecast_temperatures)
+                ]
+            }
+        }
+
+    hass.services.async_register(
+        "weather", "get_forecasts", get_forecasts, supports_response=SupportsResponse.ONLY
+    )
+    return entity_id

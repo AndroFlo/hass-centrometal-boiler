@@ -187,7 +187,12 @@ async def test_config_flow_no_biotec_plus(hass, cloud):
 
 async def test_options_flow(hass, entry):
     await setup(hass, entry)
+    # The options now start on a menu: naming, or the relight prediction
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "naming"}
+    )
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"prefix": "Home", "product_prefix": True}
@@ -195,5 +200,25 @@ async def test_options_flow(hass, entry):
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     assert entry.data["prefix"] == "Home"
+    await wait_until(lambda: entry.state is ConfigEntryState.LOADED)
+    await asyncio.sleep(0)
+
+
+async def test_options_flow_prediction(hass, entry):
+    await setup(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "prediction"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"prediction_enabled": True, "buffer_volume": 1500}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert entry.data["prediction_enabled"] is True
+    assert entry.data["buffer_volume"] == 1500
+    # The naming options are untouched by the other step
+    assert entry.data["product_prefix"] is True
     await wait_until(lambda: entry.state is ConfigEntryState.LOADED)
     await asyncio.sleep(0)

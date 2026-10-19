@@ -35,10 +35,39 @@
   "options": {
     "step": {
       "init": {
+        "description": "Choose what you want to change.",
+        "menu_options": {
+          "naming": "Entity naming",
+          "prediction": "Buffer tank relight prediction"
+        }
+      },
+      "naming": {
         "description": "Change how the entities created by this integration are named.",
         "data": {
           "prefix": "Prefix (leave empty if you do not need to prefix all entities)",
           "product_prefix": "Prefix all sensors with the boiler's name"
+        }
+      },
+      "prediction": {
+        "description": "Predict when the wood fire must be lit again so the buffer tank never runs dry. The model is deliberately simple: start with the defaults, then compare the 'observed power' and 'estimated power' attributes of the new sensors and adjust the building loss coefficient until they match.",
+        "data": {
+          "prediction_enabled": "Enable the relight prediction",
+          "buffer_volume": "Buffer tank volume (litres)",
+          "building_loss_coefficient": "Building loss coefficient (kW per K)",
+          "indoor_target_temperature": "Indoor target temperature (°C)",
+          "weather_entity": "Weather entity used for the forecast",
+          "buffer_threshold_entity": "Entity giving the temperature the tank must stay above (the heating circuit flow setpoint is used when empty)",
+          "buffer_threshold": "Fixed fallback for that temperature (°C)",
+          "buffer_threshold_offset": "Margin added to it (K)",
+          "ignition_delay": "Time from lighting the fire to the tank being charged (minutes)",
+          "safety_margin": "Extra safety margin (minutes)",
+          "relight_window_start": "Earliest time the fire can be lit",
+          "relight_window_end": "Latest time the fire can be lit",
+          "stratification_factor": "Weight of the top probe in the tank average (0 to 1)",
+          "dhw_daily_energy": "Domestic hot water drawn from the tank (kWh per day)",
+          "night_reduction_factor": "Night setback factor (1 = no setback)",
+          "night_start": "Night setback starts",
+          "night_end": "Night setback ends"
         }
       }
     }

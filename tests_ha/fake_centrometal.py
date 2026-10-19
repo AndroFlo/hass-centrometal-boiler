@@ -60,6 +60,35 @@ BIOTEC = boiler(
 )
 PELTEC = boiler(777, "PEL999", "peltec", "PelTec", {"B_STATE": "ON"})
 
+# A BioTec-Plus reporting a buffer tank, for the relight prediction. Kept separate
+# from BIOTEC so the other tests keep the exact set of entities they assert on.
+BIOTEC_BUFFER = boiler(
+    4242,
+    "ABC123",
+    "biopl",
+    "GMX EASY",
+    {
+        "B_STATE": "ON",
+        "B_pbs": "0",
+        "B_scs": "1",
+        "B_Tk1b": "65",
+        # Buffer tank probes and everything the prediction model reads
+        "B_Tak1_1": "70",
+        "B_Tak2_1": "50",
+        "B_Tva1": "0",
+        "B_Tdpl1": "25",
+        "B_Tlo1": "25",
+        "B_P1": "0",
+        "B_zahP1": "0",
+        "C1B_Tpol": "45",
+        "C1B_P": "1",
+        "PVAL_72_0": "1",
+        "PMIN_72_0": "0",
+        "PMAX_72_0": "1",
+        "PDEF_72_0": "1",
+    },
+)
+
 
 class FakeWebsite:
     """aiohttp application recording the commands it receives."""
@@ -131,6 +160,9 @@ class FakeBroker:
         self.delay = delay
         self.connections = []
         self.server = None
+        # destination -> [(websocket, subscription id)], filled by the SUBSCRIBE
+        # frames, so publish() can push values the way the real boiler does.
+        self.subscriptions: dict[str, list] = {}
 
     async def start(self) -> str:
         self.server = await serve(self.handler, "127.0.0.1", 0)
@@ -147,12 +179,39 @@ class FakeBroker:
             async for message in websocket:
                 if message == "\n":
                     continue
-                if stomper.unpack_frame(message)["cmd"] == "CONNECT":
+                frame = stomper.unpack_frame(message)
+                if frame["cmd"] == "CONNECT":
                     await websocket.send("CONNECTED\nversion:1.2\nheart-beat:0,0\n\n\x00")
+                elif frame["cmd"] == "SUBSCRIBE":
+                    headers = frame["headers"]
+                    destination = headers.get("destination", "")
+                    self.subscriptions.setdefault(destination, []).append(
+                        (websocket, headers.get("id", "0"))
+                    )
         except Exception:
             pass  # connection dropped by drop_connections()
+
+    async def publish(self, serial, params, device_type="biopl"):
+        """Push new parameter values, the way a real boiler does.
+
+        The integration only applies parameters it already knows (the library
+        ignores names absent from the initial HTTPS snapshot), so these must exist
+        in the boiler fixture.
+        """
+        destination = f"/topic/cm.inst.{device_type}.{serial}"
+        body = json.dumps(params)
+        for websocket, subscription in self.subscriptions.get(destination, []):
+            frame = (
+                f"MESSAGE\nsubscription:{subscription}\ndestination:{destination}\n"
+                f"content-type:application/json\n\n{body}\x00"
+            )
+            try:
+                await websocket.send(frame)
+            except Exception:
+                pass  # a connection dropped mid-test
 
     async def drop_connections(self):
         for websocket in self.connections:
             await websocket.close(code=1011, reason="broker restart")
         self.connections.clear()
+        self.subscriptions.clear()
